@@ -1,0 +1,1895 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Information Secure Final Project</title>
+		<link href="/stylesheets/bootstrap.min.css" type="text/css" rel="stylesheet">
+		<link href="/stylesheets/bootstrap-responsive.min.css" type="text/css" rel="stylesheet">
+	</head>
+	<body>
+		<!-- Inculde Library -->
+		<script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>
+		<script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.8.23/jquery-ui.min.js"></script>
+		<script type="text/javascript" src="/javascripts/cryptico/jsbn.js"></script>
+		<script type="text/javascript" src="/javascripts/cryptico/random.js"></script>
+		<script type="text/javascript" src="/javascripts/cryptico/hash.js"></script>
+		<script type="text/javascript" src="/javascripts/cryptico/rsa.js"></script>
+		<script type="text/javascript" src="/javascripts/cryptico/aes.js"></script>
+		<script type="text/javascript" src="/javascripts/cryptico/api.js"></script>
+		<script type="text/javascript" src="/javascripts/cryptico/rsa-pem.js"></script>
+		<script type="text/javascript" src="/javascripts/cryptico/rsa-sign.js"></script>
+		<script type="text/javascript" src="/javascripts/cryptico/x509.js"></script>
+		<script type="text/javascript" src="/javascripts/cryptico/rng.js"></script>
+		<script type="text/javascript" src="/javascripts/cryptico/rsa2.js"></script>
+		<script type="text/javascript" src="/javascripts/cryptico/jsbn2.js"></script>
+		<script type="text/javascript" src="/javascripts/cryptico/asn1hex.js"></script>
+		<script type="text/javascript" src="/javascripts/underscore-min.js"></script>
+		<script type="text/javascript" src="/javascripts/backbone-min.js"></script>
+		<script type="text/javascript" src="/javascripts/cryptoJS/core-min.js"></script>
+		<script type="text/javascript" src="/javascripts/cryptoJS/cipher-core-min.js"></script>
+		<script type="text/javascript" src="/javascripts/cryptoJS/enc-base64-min.js"></script>
+		<script type="text/javascript" src="/javascripts/cryptoJS/aes-min.js"></script>
+		<script type="text/javascript" src="/javascripts/cryptoJS/enc-utf16-min.js"></script>
+		<script type="text/javascript" src="/javascripts/cryptoJS/evpkdf-min.js"></script>
+		<script type="text/javascript" src="/javascripts/cryptoJS/md5-min.js"></script>
+		<script type="text/javascript" src="/javascripts/cryptoJS/mode-cfb-min.js"></script>
+		<script type="text/javascript" src="/javascripts/cryptoJS/mode-ctr-min.js"></script>
+		<script type="text/javascript" src="/javascripts/cryptoJS/mode-ecb-min.js"></script>
+		<script type="text/javascript" src="/javascripts/cryptoJS/mode-ofb-min.js"></script>
+		<script type="text/javascript" src="/javascripts/cryptoJS/hmac-min.js"></script>
+		<script type="text/javascript" src="/javascripts/cryptoJS/sha1-min.js"></script>
+		<script type="text/javascript" src="/javascripts/cryptoJS/sha256-min.js"></script>
+		<script type="text/javascript" src="/javascripts/cryptoJS/sha512-min.js"></script>
+
+
+
+		<div id="TopNavigator"></div>
+		<div id="MainContainer" class="container-fluid">
+			<div id="NavbarPadding" class="row-fluid"></div>
+			<div class="row-fluid Content"></div>
+			<div id="BlankAboveFooter" class="row-fluid"></div>
+			<div id="ModalPanelContainer"><div>
+		</div>
+		<footer></footer>
+
+		<!-- User Model -->
+		<script type="text/javascript">
+			UserModel = Backbone.Model.extend({
+				defaults:{
+					"login":false,
+					"type":""
+				},
+				initialize:function(){
+					this.checkLoginStatus();
+				},
+				render:function(){
+					initialize();
+				},
+				userLogin:function(){
+					console.log("userLogin");
+					console.log(account);
+					console.log(password);
+					input = {
+						account:account,
+						password:password
+					}
+					console.log(input);
+					var userLoginCallBack = function(context){
+						return function(data, textStatus, jqXHR){
+							console.log("data");
+							console.log(data);
+							if(data.result == true){
+								context.set({login:true, type:data.type});
+							}else{
+								alert("登入失敗！");
+								location.reload();
+							}
+						};
+					};
+					$.get(
+						"/login",
+						input,
+						userLoginCallBack(this),
+						"json"
+					);
+				},
+				checkLoginStatus:function(){
+					console.log("checkLoginStatus");
+					var checkLoginStatusCallBack = function(context){
+						return function(data, textStatus, jqXHR){
+							console.log(data);
+							if(data.result == true){
+								console.log("已登入");
+								context.set({login:true, type:data.type});
+								// if(data.type == "Purchaser"){
+								// 	window.purchaserModel = new PurchaserModel();
+								// }else if(data.type == "Supervisor"){
+								// 	window.supervisorModel = new SupervisorModel();
+								// }else if(data.type == "OrdersDepartment"){
+								// 	window.ordersDepartmentModel = new OrdersDepartmentModel();
+								// }
+							}else{
+								console.log("尚未登入");	
+							}
+						};
+					};
+					$.get(
+						"/checkLoginStatus",
+						checkLoginStatusCallBack(this),
+						"json"
+					);
+				}
+			});
+		</script>
+		<!--  Purchaser Model  -->
+		<script type="text/javascript">
+			PurchaserModel = Backbone.Model.extend({
+				defaults:{
+					"user":"purchaser",
+					"privateKey":"",
+					"myPublicKeyString":"",
+					"supervisorPublicKeyString":"",
+					"ordersDepartmentPublicKeyString":""
+				},
+				initialize:function(){
+					this.getMyKey();
+					// console.log("model");
+					console.log(this);
+				},
+				render:function(){
+					initialize();
+				},
+				getMyKey:function(){
+					console.log("getKey");
+					var getMyKeyCallBack = function(context){
+						return function(data, textStatus, jqXHR){
+							if(data == undefined){
+								var PassPhrase = "Purchaser";
+        						var Bits = 512;
+        						var purchaserRSAkey = cryptico.generateRSAKey(PassPhrase, Bits);
+        						var purchaserPublicKeyString = cryptico.publicKeyString(purchaserRSAkey);    
+        						context.set({
+        							privateKey:purchaserRSAkey,
+        							myPublicKeyString:purchaserPublicKeyString
+        						});
+        						context.setMyKey(context);
+							}else if(data.privateKey == undefined){
+								var PassPhrase = "Purchaser";
+        						var Bits = 512;
+        						var purchaserRSAkey = cryptico.generateRSAKey(PassPhrase, Bits);
+        						var purchaserPublicKeyString = cryptico.publicKeyString(purchaserRSAkey);    
+        						context.set({
+        							privateKey:purchaserRSAkey,
+        							myPublicKeyString:purchaserPublicKeyString
+        						});
+        						context.setMyKey(context);
+        						context.setPublicKeyString(data);
+							}
+							else{
+								context.set({
+									privateKey:context.regenerateRSAKey(data.privateKey),
+        							myPublicKeyString:data.publicKeyString
+								});
+								context.setPublicKeyString(data);
+							}
+						};
+					};
+					$.get(
+						"/Purchaser/PrivateKey",
+						getMyKeyCallBack(this),
+						"json"
+					);
+				},
+				setMyKey:function(context){
+					var input = {
+						privateKey:JSON.stringify(context.get("privateKey")),
+						publicKeyString:context.get("myPublicKeyString")
+					};
+					var privateKeyCallback = function(context){
+						return function(data, textStatus, jqXHR){
+						}
+					}
+					$.post(
+						"/Purchaser/PrivateKey",
+						input,
+						privateKeyCallback(this)
+					);
+				},
+				setPublicKeyString:function(data){
+					// console.log("setPublicKeyString");
+					// console.log(data);
+					this.set({
+						ordersDepartmentPublicKeyString:data.ordersDepartmentPublicKeyString,
+        				supervisorPublicKeyString:data.supervisorPublicKeyString
+					});
+				},
+				regenerateRSAKey:function(privateKey){
+					var PassPhrase = "Purchaser";
+					var Bits = 512;
+					var newKey = cryptico.generateRSAKey(PassPhrase, Bits);
+				    newKey.n['0'] = privateKey.n['0'];
+				    newKey.n['1'] = privateKey.n['1'];
+				    newKey.n['2'] = privateKey.n['2'];
+				    newKey.n['3'] = privateKey.n['3'];
+				    newKey.n['4'] = privateKey.n['4'];
+				    newKey.n['5'] = privateKey.n['5'];
+				    newKey.n['6'] = privateKey.n['6'];
+				    newKey.n['7'] = privateKey.n['7'];
+				    newKey.n['8'] = privateKey.n['8'];
+				    newKey.n['9'] = privateKey.n['9'];
+				    newKey.n['10'] = privateKey.n['10'];
+				    newKey.n['11'] = privateKey.n['11'];
+				    newKey.n['12'] = privateKey.n['12'];
+				    newKey.n['13'] = privateKey.n['13'];
+				    newKey.n['14'] = privateKey.n['14'];
+				    newKey.n['15'] = privateKey.n['15'];
+				    newKey.n['16'] = privateKey.n['16'];
+				    newKey.n['17'] = privateKey.n['17'];
+				    newKey.n['18'] = privateKey.n['18'];
+				    newKey.n['19'] = privateKey.n['19'];
+				    newKey.e = privateKey.e;
+				    newKey.d = privateKey.d;
+				    newKey.p['0'] = privateKey.p['0'];
+				    newKey.p['1'] = privateKey.p['1'];
+				    newKey.p['2'] = privateKey.p['2'];
+				    newKey.p['3'] = privateKey.p['3'];
+				    newKey.p['4'] = privateKey.p['4'];
+				    newKey.p['5'] = privateKey.p['5'];
+				    newKey.p['6'] = privateKey.p['6'];
+				    newKey.p['7'] = privateKey.p['7'];
+				    newKey.p['8'] = privateKey.p['8'];
+				    newKey.p['9'] = privateKey.p['9'];
+				    newKey.p['10'] = privateKey.p['10'];
+				    newKey.p['11'] = privateKey.p['11'];
+				    newKey.p['12'] = privateKey.p['12'];
+				    newKey.p['13'] = privateKey.p['13'];
+				    newKey.p['14'] = privateKey.p['14'];
+				    newKey.p['15'] = privateKey.p['15'];
+				    newKey.p['16'] = privateKey.p['16'];
+				    newKey.p['17'] = privateKey.p['17'];
+				    newKey.p['18'] = privateKey.p['18'];
+				    newKey.p['19'] = privateKey.p['19'];
+
+				    newKey.q['0'] = privateKey.q['0'];
+				    newKey.q['1'] = privateKey.q['1'];
+				    newKey.q['2'] = privateKey.q['2'];
+				    newKey.q['3'] = privateKey.q['3'];
+				    newKey.q['4'] = privateKey.q['4'];
+				    newKey.q['5'] = privateKey.q['5'];
+				    newKey.q['6'] = privateKey.q['6'];
+				    newKey.q['7'] = privateKey.q['7'];
+				    newKey.q['8'] = privateKey.q['8'];
+				    newKey.q['9'] = privateKey.q['9'];
+
+
+				    newKey.dmp1['0'] = privateKey.dmp1['0'];
+				    newKey.dmp1['1'] = privateKey.dmp1['1'];
+				    newKey.dmp1['2'] = privateKey.dmp1['2'];
+				    newKey.dmp1['3'] = privateKey.dmp1['3'];
+				    newKey.dmp1['4'] = privateKey.dmp1['4'];
+				    newKey.dmp1['5'] = privateKey.dmp1['5'];
+				    newKey.dmp1['6'] = privateKey.dmp1['6'];
+				    newKey.dmp1['7'] = privateKey.dmp1['7'];
+				    newKey.dmp1['8'] = privateKey.dmp1['8'];
+				    newKey.dmp1['9'] = privateKey.dmp1['9'];
+				    newKey.dmp1['10'] = privateKey.dmp1['10'];
+				    newKey.dmp1['11'] = privateKey.dmp1['11'];
+				    newKey.dmp1['12'] = privateKey.dmp1['12'];
+				    newKey.dmp1['13'] = privateKey.dmp1['13'];
+				    newKey.dmp1['14'] = privateKey.dmp1['14'];
+				    newKey.dmp1['15'] = privateKey.dmp1['15'];
+				    newKey.dmp1['16'] = privateKey.dmp1['16'];
+				    newKey.dmp1['17'] = privateKey.dmp1['17'];
+				    newKey.dmp1['18'] = privateKey.dmp1['18'];
+				    newKey.dmp1['19'] = privateKey.dmp1['19'];
+
+				    newKey.dmq1['0'] = privateKey.dmq1['0'];
+				    newKey.dmq1['1'] = privateKey.dmq1['1'];
+				    newKey.dmq1['2'] = privateKey.dmq1['2'];
+				    newKey.dmq1['3'] = privateKey.dmq1['3'];
+				    newKey.dmq1['4'] = privateKey.dmq1['4'];
+				    newKey.dmq1['5'] = privateKey.dmq1['5'];
+				    newKey.dmq1['6'] = privateKey.dmq1['6'];
+				    newKey.dmq1['7'] = privateKey.dmq1['7'];
+				    newKey.dmq1['8'] = privateKey.dmq1['8'];
+				    newKey.dmq1['9'] = privateKey.dmq1['9'];
+				    newKey.dmq1['10'] = privateKey.dmq1['10'];
+				    newKey.dmq1['11'] = privateKey.dmq1['11'];
+				    newKey.dmq1['12'] = privateKey.dmq1['12'];
+				    newKey.dmq1['13'] = privateKey.dmq1['13'];
+				    newKey.dmq1['14'] = privateKey.dmq1['14'];
+				    newKey.dmq1['15'] = privateKey.dmq1['15'];
+				    newKey.dmq1['16'] = privateKey.dmq1['16'];
+				    newKey.dmq1['17'] = privateKey.dmq1['17'];
+				    newKey.dmq1['18'] = privateKey.dmq1['18'];
+				    newKey.dmq1['19'] = privateKey.dmq1['19'];
+
+				    newKey.coeff['0'] = privateKey.coeff['0'];
+				    newKey.coeff['1'] = privateKey.coeff['1'];
+				    newKey.coeff['2'] = privateKey.coeff['2'];
+				    newKey.coeff['3'] = privateKey.coeff['3'];
+				    newKey.coeff['4'] = privateKey.coeff['4'];
+				    newKey.coeff['5'] = privateKey.coeff['5'];
+				    newKey.coeff['6'] = privateKey.coeff['6'];
+				    newKey.coeff['7'] = privateKey.coeff['7'];
+				    newKey.coeff['8'] = privateKey.coeff['8'];
+				    newKey.coeff['9'] = privateKey.coeff['9'];
+				    return newKey;
+				}
+			});
+		</script>
+		<!--  Supervisor Model  -->
+		<script type="text/javascript">
+			SupervisorModel = Backbone.Model.extend({
+				defaults:{
+					"user":"supervisor",
+					"privateKey":"",
+					"myPublicKeyString":"",
+					"purchaserPublicKeyString":"",
+					"ordersDepartmentPublicKeyString":""
+				},
+				initialize:function(){
+					this.getMyKey();
+					// console.log("model");
+					console.log(this);
+				},
+				render:function(){
+					initialize();
+				},
+				getMyKey:function(){
+					console.log("getKey");
+					var getMyKeyCallBack = function(context){
+						return function(data, textStatus, jqXHR){
+							console.log(data);
+							if(data == undefined){
+								console.log("data == undefined");
+								var PassPhrase = "Supervisor";
+        						var Bits = 512;
+        						var supervisorRSAkey = cryptico.generateRSAKey(PassPhrase, Bits);
+        						var supervisorPublicKeyString = cryptico.publicKeyString(supervisorRSAkey);    
+        						context.set({
+        							privateKey:supervisorRSAkey,
+        							myPublicKeyString:supervisorPublicKeyString
+        						});
+        						context.setMyKey(context);
+							}else if(data.privateKey == undefined){
+								console.log("data.privateKey == undefined");
+								var PassPhrase = "Supervisor";
+        						var Bits = 512;
+        						var supervisorRSAkey = cryptico.generateRSAKey(PassPhrase, Bits);
+        						var supervisorPublicKeyString = cryptico.publicKeyString(supervisorRSAkey);    
+        						context.set({
+        							privateKey:supervisorRSAkey,
+        							myPublicKeyString:supervisorPublicKeyString
+        						});
+        						context.setMyKey(context);
+        						context.setPublicKeyString(data);
+							}else{
+								console.log("else");
+								var privateKey = context.regenerateRSAKey(data.privateKey);
+								context.set({
+									privateKey: privateKey,
+        							myPublicKeyString:data.publicKeyString
+								});
+								context.setPublicKeyString(data);
+							}
+						};
+					};
+					$.get(
+						"/Supervisor/PrivateKey",
+						getMyKeyCallBack(this),
+						"json"
+					);
+				},
+				setMyKey:function(context){
+					var input = {
+						privateKey:JSON.stringify(context.get("privateKey")),
+						publicKeyString:context.get("myPublicKeyString")
+					};
+					var privateKeyCallback = function(context){
+						return function(data, textStatus, jqXHR){
+						}
+					}
+					$.post(
+						"/Supervisor/PrivateKey",
+						input,
+						privateKeyCallback(this)
+					);
+				},
+				setPublicKeyString:function(data){
+					// console.log("setPublicKeyString");
+					// console.log(data);
+					this.set({
+						purchaserPublicKeyString:data.purchaserPublicKeyString,
+						ordersDepartmentPublicKeyString:data.ordersDepartmentPublicKeyString
+					});
+				},
+				regenerateRSAKey:function(privateKey){
+					var PassPhrase = "Supervisor";
+					var Bits = 512;
+					var newKey = cryptico.generateRSAKey(PassPhrase, Bits);
+				    newKey.n['0'] = privateKey.n['0'];
+				    newKey.n['1'] = privateKey.n['1'];
+				    newKey.n['2'] = privateKey.n['2'];
+				    newKey.n['3'] = privateKey.n['3'];
+				    newKey.n['4'] = privateKey.n['4'];
+				    newKey.n['5'] = privateKey.n['5'];
+				    newKey.n['6'] = privateKey.n['6'];
+				    newKey.n['7'] = privateKey.n['7'];
+				    newKey.n['8'] = privateKey.n['8'];
+				    newKey.n['9'] = privateKey.n['9'];
+				    newKey.n['10'] = privateKey.n['10'];
+				    newKey.n['11'] = privateKey.n['11'];
+				    newKey.n['12'] = privateKey.n['12'];
+				    newKey.n['13'] = privateKey.n['13'];
+				    newKey.n['14'] = privateKey.n['14'];
+				    newKey.n['15'] = privateKey.n['15'];
+				    newKey.n['16'] = privateKey.n['16'];
+				    newKey.n['17'] = privateKey.n['17'];
+				    newKey.n['18'] = privateKey.n['18'];
+				    newKey.n['19'] = privateKey.n['19'];
+				    newKey.e = privateKey.e;
+				    newKey.d = privateKey.d;
+				    newKey.p['0'] = privateKey.p['0'];
+				    newKey.p['1'] = privateKey.p['1'];
+				    newKey.p['2'] = privateKey.p['2'];
+				    newKey.p['3'] = privateKey.p['3'];
+				    newKey.p['4'] = privateKey.p['4'];
+				    newKey.p['5'] = privateKey.p['5'];
+				    newKey.p['6'] = privateKey.p['6'];
+				    newKey.p['7'] = privateKey.p['7'];
+				    newKey.p['8'] = privateKey.p['8'];
+				    newKey.p['9'] = privateKey.p['9'];
+				    newKey.p['10'] = privateKey.p['10'];
+				    newKey.p['11'] = privateKey.p['11'];
+				    newKey.p['12'] = privateKey.p['12'];
+				    newKey.p['13'] = privateKey.p['13'];
+				    newKey.p['14'] = privateKey.p['14'];
+				    newKey.p['15'] = privateKey.p['15'];
+				    newKey.p['16'] = privateKey.p['16'];
+				    newKey.p['17'] = privateKey.p['17'];
+				    newKey.p['18'] = privateKey.p['18'];
+				    newKey.p['19'] = privateKey.p['19'];
+
+				    newKey.q['0'] = privateKey.q['0'];
+				    newKey.q['1'] = privateKey.q['1'];
+				    newKey.q['2'] = privateKey.q['2'];
+				    newKey.q['3'] = privateKey.q['3'];
+				    newKey.q['4'] = privateKey.q['4'];
+				    newKey.q['5'] = privateKey.q['5'];
+				    newKey.q['6'] = privateKey.q['6'];
+				    newKey.q['7'] = privateKey.q['7'];
+				    newKey.q['8'] = privateKey.q['8'];
+				    newKey.q['9'] = privateKey.q['9'];
+
+
+				    newKey.dmp1['0'] = privateKey.dmp1['0'];
+				    newKey.dmp1['1'] = privateKey.dmp1['1'];
+				    newKey.dmp1['2'] = privateKey.dmp1['2'];
+				    newKey.dmp1['3'] = privateKey.dmp1['3'];
+				    newKey.dmp1['4'] = privateKey.dmp1['4'];
+				    newKey.dmp1['5'] = privateKey.dmp1['5'];
+				    newKey.dmp1['6'] = privateKey.dmp1['6'];
+				    newKey.dmp1['7'] = privateKey.dmp1['7'];
+				    newKey.dmp1['8'] = privateKey.dmp1['8'];
+				    newKey.dmp1['9'] = privateKey.dmp1['9'];
+				    newKey.dmp1['10'] = privateKey.dmp1['10'];
+				    newKey.dmp1['11'] = privateKey.dmp1['11'];
+				    newKey.dmp1['12'] = privateKey.dmp1['12'];
+				    newKey.dmp1['13'] = privateKey.dmp1['13'];
+				    newKey.dmp1['14'] = privateKey.dmp1['14'];
+				    newKey.dmp1['15'] = privateKey.dmp1['15'];
+				    newKey.dmp1['16'] = privateKey.dmp1['16'];
+				    newKey.dmp1['17'] = privateKey.dmp1['17'];
+				    newKey.dmp1['18'] = privateKey.dmp1['18'];
+				    newKey.dmp1['19'] = privateKey.dmp1['19'];
+
+				    newKey.dmq1['0'] = privateKey.dmq1['0'];
+				    newKey.dmq1['1'] = privateKey.dmq1['1'];
+				    newKey.dmq1['2'] = privateKey.dmq1['2'];
+				    newKey.dmq1['3'] = privateKey.dmq1['3'];
+				    newKey.dmq1['4'] = privateKey.dmq1['4'];
+				    newKey.dmq1['5'] = privateKey.dmq1['5'];
+				    newKey.dmq1['6'] = privateKey.dmq1['6'];
+				    newKey.dmq1['7'] = privateKey.dmq1['7'];
+				    newKey.dmq1['8'] = privateKey.dmq1['8'];
+				    newKey.dmq1['9'] = privateKey.dmq1['9'];
+				    newKey.dmq1['10'] = privateKey.dmq1['10'];
+				    newKey.dmq1['11'] = privateKey.dmq1['11'];
+				    newKey.dmq1['12'] = privateKey.dmq1['12'];
+				    newKey.dmq1['13'] = privateKey.dmq1['13'];
+				    newKey.dmq1['14'] = privateKey.dmq1['14'];
+				    newKey.dmq1['15'] = privateKey.dmq1['15'];
+				    newKey.dmq1['16'] = privateKey.dmq1['16'];
+				    newKey.dmq1['17'] = privateKey.dmq1['17'];
+				    newKey.dmq1['18'] = privateKey.dmq1['18'];
+				    newKey.dmq1['19'] = privateKey.dmq1['19'];
+
+				    newKey.coeff['0'] = privateKey.coeff['0'];
+				    newKey.coeff['1'] = privateKey.coeff['1'];
+				    newKey.coeff['2'] = privateKey.coeff['2'];
+				    newKey.coeff['3'] = privateKey.coeff['3'];
+				    newKey.coeff['4'] = privateKey.coeff['4'];
+				    newKey.coeff['5'] = privateKey.coeff['5'];
+				    newKey.coeff['6'] = privateKey.coeff['6'];
+				    newKey.coeff['7'] = privateKey.coeff['7'];
+				    newKey.coeff['8'] = privateKey.coeff['8'];
+				    newKey.coeff['9'] = privateKey.coeff['9'];
+				    return newKey
+				}			
+			});
+		</script>
+		<!--  Orders Department Model  -->
+		<script type="text/javascript">
+			OrdersDepartmentModel = Backbone.Model.extend({
+				defaults:{
+					"user":"ordersDepartment",
+					"privateKey":"",
+					"myPublicKeyString":"",
+					"purchaserPublicKeyString":"",
+					"supervisorPublicKeyString":""
+				},
+				initialize:function(){
+					this.getMyKey();
+					// console.log("model");
+					console.log(this);
+				},
+				render:function(){
+					initialize();
+				},
+				getMyKey:function(){
+					console.log("getKey");
+					var getMyKeyCallBack = function(context){
+						return function(data, textStatus, jqXHR){
+							if(data == undefined){
+								var PassPhrase = "Supervisor";
+        						var Bits = 512;
+        						var ordersDepartmentRSAkey = cryptico.generateRSAKey(PassPhrase, Bits);
+        						var ordersDepartmentPublicKeyString = cryptico.publicKeyString(ordersDepartmentRSAkey);    
+        						context.set({
+        							privateKey:ordersDepartmentRSAkey,
+        							myPublicKeyString:ordersDepartmentPublicKeyString
+        						});
+        						context.setMyKey(context);
+							}else if(data.privateKey == undefined){
+								var PassPhrase = "Supervisor";
+        						var Bits = 512;
+        						var ordersDepartmentRSAkey = cryptico.generateRSAKey(PassPhrase, Bits);
+        						var ordersDepartmentPublicKeyString = cryptico.publicKeyString(ordersDepartmentRSAkey);    
+        						context.set({
+        							privateKey:ordersDepartmentRSAkey,
+        							myPublicKeyString:ordersDepartmentPublicKeyString
+        						});
+        						context.setMyKey(context);
+        						context.setPublicKeyString(data);
+							}else{
+								context.set({
+									privateKey:context.regenerateRSAKey(data.privateKey),
+        							myPublicKeyString:data.publicKeyString
+								});
+								context.setPublicKeyString(data);
+							}
+						};
+					};
+					$.get(
+						"/OrdersDepartment/PrivateKey",
+						getMyKeyCallBack(this),
+						"json"
+					);
+				},
+				setMyKey:function(context){
+					var input = {
+						privateKey:JSON.stringify(context.get("privateKey")),
+						publicKeyString:context.get("myPublicKeyString")
+					};
+					var privateKeyCallback = function(context){
+						return function(data, textStatus, jqXHR){
+						}
+					}
+					$.post(
+						"/OrdersDepartment/PrivateKey",
+						input,
+						privateKeyCallback(this)
+					);
+				},
+				setPublicKeyString:function(data){
+					console.log("setPublicKeyString");
+					console.log(data);
+					this.set({
+						purchaserPublicKeyString:data.purchaserPublicKeyString,
+						supervisorPublicKeyString:data.supervisorPublicKeyString
+					});
+				},
+				regenerateRSAKey:function(privateKey){
+					var PassPhrase = "OrdersDepartment";
+					var Bits = 512;
+					var newKey = cryptico.generateRSAKey(PassPhrase, Bits);
+				    newKey.n['0'] = privateKey.n['0'];
+				    newKey.n['1'] = privateKey.n['1'];
+				    newKey.n['2'] = privateKey.n['2'];
+				    newKey.n['3'] = privateKey.n['3'];
+				    newKey.n['4'] = privateKey.n['4'];
+				    newKey.n['5'] = privateKey.n['5'];
+				    newKey.n['6'] = privateKey.n['6'];
+				    newKey.n['7'] = privateKey.n['7'];
+				    newKey.n['8'] = privateKey.n['8'];
+				    newKey.n['9'] = privateKey.n['9'];
+				    newKey.n['10'] = privateKey.n['10'];
+				    newKey.n['11'] = privateKey.n['11'];
+				    newKey.n['12'] = privateKey.n['12'];
+				    newKey.n['13'] = privateKey.n['13'];
+				    newKey.n['14'] = privateKey.n['14'];
+				    newKey.n['15'] = privateKey.n['15'];
+				    newKey.n['16'] = privateKey.n['16'];
+				    newKey.n['17'] = privateKey.n['17'];
+				    newKey.n['18'] = privateKey.n['18'];
+				    newKey.n['19'] = privateKey.n['19'];
+				    newKey.e = privateKey.e;
+				    newKey.d = privateKey.d;
+				    newKey.p['0'] = privateKey.p['0'];
+				    newKey.p['1'] = privateKey.p['1'];
+				    newKey.p['2'] = privateKey.p['2'];
+				    newKey.p['3'] = privateKey.p['3'];
+				    newKey.p['4'] = privateKey.p['4'];
+				    newKey.p['5'] = privateKey.p['5'];
+				    newKey.p['6'] = privateKey.p['6'];
+				    newKey.p['7'] = privateKey.p['7'];
+				    newKey.p['8'] = privateKey.p['8'];
+				    newKey.p['9'] = privateKey.p['9'];
+				    newKey.p['10'] = privateKey.p['10'];
+				    newKey.p['11'] = privateKey.p['11'];
+				    newKey.p['12'] = privateKey.p['12'];
+				    newKey.p['13'] = privateKey.p['13'];
+				    newKey.p['14'] = privateKey.p['14'];
+				    newKey.p['15'] = privateKey.p['15'];
+				    newKey.p['16'] = privateKey.p['16'];
+				    newKey.p['17'] = privateKey.p['17'];
+				    newKey.p['18'] = privateKey.p['18'];
+				    newKey.p['19'] = privateKey.p['19'];
+
+				    newKey.q['0'] = privateKey.q['0'];
+				    newKey.q['1'] = privateKey.q['1'];
+				    newKey.q['2'] = privateKey.q['2'];
+				    newKey.q['3'] = privateKey.q['3'];
+				    newKey.q['4'] = privateKey.q['4'];
+				    newKey.q['5'] = privateKey.q['5'];
+				    newKey.q['6'] = privateKey.q['6'];
+				    newKey.q['7'] = privateKey.q['7'];
+				    newKey.q['8'] = privateKey.q['8'];
+				    newKey.q['9'] = privateKey.q['9'];
+
+
+				    newKey.dmp1['0'] = privateKey.dmp1['0'];
+				    newKey.dmp1['1'] = privateKey.dmp1['1'];
+				    newKey.dmp1['2'] = privateKey.dmp1['2'];
+				    newKey.dmp1['3'] = privateKey.dmp1['3'];
+				    newKey.dmp1['4'] = privateKey.dmp1['4'];
+				    newKey.dmp1['5'] = privateKey.dmp1['5'];
+				    newKey.dmp1['6'] = privateKey.dmp1['6'];
+				    newKey.dmp1['7'] = privateKey.dmp1['7'];
+				    newKey.dmp1['8'] = privateKey.dmp1['8'];
+				    newKey.dmp1['9'] = privateKey.dmp1['9'];
+				    newKey.dmp1['10'] = privateKey.dmp1['10'];
+				    newKey.dmp1['11'] = privateKey.dmp1['11'];
+				    newKey.dmp1['12'] = privateKey.dmp1['12'];
+				    newKey.dmp1['13'] = privateKey.dmp1['13'];
+				    newKey.dmp1['14'] = privateKey.dmp1['14'];
+				    newKey.dmp1['15'] = privateKey.dmp1['15'];
+				    newKey.dmp1['16'] = privateKey.dmp1['16'];
+				    newKey.dmp1['17'] = privateKey.dmp1['17'];
+				    newKey.dmp1['18'] = privateKey.dmp1['18'];
+				    newKey.dmp1['19'] = privateKey.dmp1['19'];
+
+				    newKey.dmq1['0'] = privateKey.dmq1['0'];
+				    newKey.dmq1['1'] = privateKey.dmq1['1'];
+				    newKey.dmq1['2'] = privateKey.dmq1['2'];
+				    newKey.dmq1['3'] = privateKey.dmq1['3'];
+				    newKey.dmq1['4'] = privateKey.dmq1['4'];
+				    newKey.dmq1['5'] = privateKey.dmq1['5'];
+				    newKey.dmq1['6'] = privateKey.dmq1['6'];
+				    newKey.dmq1['7'] = privateKey.dmq1['7'];
+				    newKey.dmq1['8'] = privateKey.dmq1['8'];
+				    newKey.dmq1['9'] = privateKey.dmq1['9'];
+				    newKey.dmq1['10'] = privateKey.dmq1['10'];
+				    newKey.dmq1['11'] = privateKey.dmq1['11'];
+				    newKey.dmq1['12'] = privateKey.dmq1['12'];
+				    newKey.dmq1['13'] = privateKey.dmq1['13'];
+				    newKey.dmq1['14'] = privateKey.dmq1['14'];
+				    newKey.dmq1['15'] = privateKey.dmq1['15'];
+				    newKey.dmq1['16'] = privateKey.dmq1['16'];
+				    newKey.dmq1['17'] = privateKey.dmq1['17'];
+				    newKey.dmq1['18'] = privateKey.dmq1['18'];
+				    newKey.dmq1['19'] = privateKey.dmq1['19'];
+
+				    newKey.coeff['0'] = privateKey.coeff['0'];
+				    newKey.coeff['1'] = privateKey.coeff['1'];
+				    newKey.coeff['2'] = privateKey.coeff['2'];
+				    newKey.coeff['3'] = privateKey.coeff['3'];
+				    newKey.coeff['4'] = privateKey.coeff['4'];
+				    newKey.coeff['5'] = privateKey.coeff['5'];
+				    newKey.coeff['6'] = privateKey.coeff['6'];
+				    newKey.coeff['7'] = privateKey.coeff['7'];
+				    newKey.coeff['8'] = privateKey.coeff['8'];
+				    newKey.coeff['9'] = privateKey.coeff['9'];
+				    return newKey;
+				}			
+			});
+		</script>
+
+
+		<!-- TopNavigator View -->
+		<script type="text/template" id="TopNavigator_Template">
+			<div class="navbar">
+	  			<div class="navbar-inner">
+	    			<a class="brand" href="/" data-toggle="dropdown">Information Secure Final Project</a>
+	    			<ul class="nav">
+	      				<li ><a href="/Purchaser" class="Purchaser">Purchaser</a></li>
+	      				<li ><a href="/Supervisor" class="Supervisor">Supervisor</a></li>
+	      				<li ><a href="/OrdersDepartment" class="OrdersDepartment">Orders Department</a></li>
+	    			</ul>
+	  			</div>
+			</div>
+		</script>
+		<script type="text/javascript">
+			TopNavigatorView = Backbone.View.extend({
+				initialize: function(){
+					this.render();
+				},
+				render:function(){
+					var template = _.template( $("#TopNavigator_Template").html(), {} );
+					this.$el.html( template );
+				},
+				events:{
+					"click li":"changeHighlightItem",
+					// "click .Purchaser":"purchaserLogin",
+					// "click .Supervisor":"supervisorLogin",
+					// "click .OrdersDepartment":"ordersDepartmentLogin"
+				},
+				clearHighlightItem: function(){
+					this.$el.find("li").removeClass("active");
+				},
+				changeHighlightItem: function(event){
+					this.clearHighlightItem();
+					$(event.target).parent().addClass("active");
+				}
+
+			});
+		</script>
+
+		<!-- MainContainerView -->
+		<script type="text/template" id="MainContainerTemplate">
+		</script>
+
+		<script type="text/javascript">
+			MainContainerView = Backbone.View.extend({
+				indexView:null,
+				purchaserView:null,
+				ordersDepartmentView:null,
+				currentContentView:null,
+				supervisorView:null,
+				initialize:function(){
+					this.purchaserView = new PurchaserView();
+					this.indexView = new IndexView();
+					this.ordersDepartmentView = new OrdersDepartmentView();
+					this.supervisorView = new SupervisorView();
+					this.render();
+				},
+				render:function(){
+					// var template = _.template( $("#MainContainerTemplate").html(), {} );
+					// this.$el.html( template );
+					// leftMenu = this.$el.find(".LeftList");
+					// console.log(leftMenu);
+					// leftMenu.append("<li><a href=\"/網址\"><i class=\"icon-group\"></i>帥哥</a></li>")
+				},
+				changeContent: function(newContentView){
+					// console.log(window.mainContainerView.indexView);
+					// console.log("changeContent");
+					// console.log(this.currentContentView);
+					// console.log(newContentView);
+					if(this.currentContentView != newContentView){
+						this.currentContentView = newContentView;
+						this.currentContentView.setElement(this.$el.children(".Content"));
+						this.currentContentView.render();
+					}
+				}
+			});
+		</script>
+		<script type="text/template" id="IndexTemplate">
+			<div class="span2 LeftMenu">
+				<div class="span10 well" style="padding: 8px 0;">
+					<ul class="nav nav-list LeftList">
+						<li style="text-align:auto"><a href="/temp"><i class="icon-group"></i>系統架構</li>
+					</ul>
+				</div>
+			</div>
+			<div class="span10 ContentContainer">
+				<h1>Demo</h1>
+			</div>
+		</script>
+
+		<!-- IndexView -->
+		<script type="text/javascript">
+			IndexView = Backbone.View.extend({
+				initialize:function(){
+				},
+				render:function(){
+					// console.log("IndexView");
+					var template = _.template( $("#IndexTemplate").html(), {} );
+					this.$el.html( template );
+					// leftMenu = this.$el.find(".LeftList");
+					// console.log(leftMenu);
+					// leftMenu.append("<li><a href=\"/網址\"><i class=\"icon-group\"></i>帥哥</a></li>")
+				}
+			});
+		</script>
+		<!-- PurchaserOrderModel -->
+		<script type="text/javascript">
+			PurchaserOrderModel = Backbone.Model.extend({
+				defaults:{
+					orderNumber:"",
+					goods:"",
+					counts:"",
+					price:"",
+					status:""
+				},
+				initialize:function(){
+
+				},
+				render:function(){
+
+				}
+			});
+			PurchaserOrderCollection = Backbone.Collection.extend({
+				model:PurchaserOrderModel,
+				pushPurchaserOrderModel:function(order){
+					console.log("push");
+					this.push(order);
+				}
+			});
+			PurchaserOrderControllerModel = Backbone.Model.extend({
+				defaults:{
+					purchaserOrderCollection: new PurchaserOrderCollection(),
+					purchasedOrderCollection: new PurchaserOrderCollection()
+				},
+				initialize:function(){
+
+				},
+				updatePurchasedOrder:function(){
+					console.log("updatePurchasedOrder");
+					var PurchasedOrderCallback = function(context){
+						return function(data, textStatus, jqXHR){
+							console.log("data");
+							console.log(data);
+							if(data != null){
+								if(data.ordersDepartmentToPurchaserEncryptOrders instanceof Array){
+									var EncryptOrders = data.ordersDepartmentToPurchaserEncryptOrders;
+									EncryptOrders.forEach(function(EncryptOrder){
+										console.log(window.purchaserModel.get("privateKey"));
+										var DecryptOrder = cryptico.decrypt(EncryptOrder.cipher, window.purchaserModel.get("privateKey"));
+										console.log(DecryptOrder);
+										var order = JSON.parse(DecryptOrder.plaintext);
+										// console.log(order.signature);
+										if(DecryptOrder.signature == 'verified'){
+											newPurchasedOrder = new PurchaserOrderModel();
+											newPurchasedOrder.set({
+												orderNumber:order.orderNumber,
+												goods:order.goods,
+												counts:order.counts,
+												price:order.price,
+												status:order.status,
+												timestamp:order.timestamp
+											});
+											console.log(newPurchasedOrder);
+											context.get("purchasedOrderCollection").pushPurchaserOrderModel(newPurchasedOrder);
+										}
+									});
+								}
+							}
+						}
+					};
+					$.get(
+						"/Purchaser/getPurchasedOrder",
+						PurchasedOrderCallback(this),
+						"json"
+					);
+				},
+				updatePurchaserOrders:function(){
+					console.log("updatePurchaserOrders");
+					var updatePurchaserOrdersCallback = function(context){
+						return function(data, textStatus, jqXHR){
+							// console.log(JSON.stringify(data));
+							if(data != undefined){
+								var orderList = data.orders;
+								orderList.forEach(function(order){
+									newPurchaserOrder = new PurchaserOrderModel();
+									newPurchaserOrder.set({
+										orderNumber:order.orderNumber,
+										goods:order.goods,
+										counts:order.counts,
+										price:order.price,
+										status:order.status
+									});
+									context.get("purchaserOrderCollection").pushPurchaserOrderModel(newPurchaserOrder);
+								});
+							}
+						}
+					};
+					$.get(
+						"/Purchaser/Orders",
+						updatePurchaserOrdersCallback(this),
+						"json"
+					);
+				}
+			});
+		</script>
+		<!-- Purchaser View -->
+		<script type="text/template" id="PurchaserTemplate">
+			<div class="span2 LeftMenu">
+				<div class="span10 well" style="padding: 8px 0;">
+					<ul class="nav nav-list LeftList">
+						<li class="writeOrder" style="text-align:auto"><a href="/Purchaser"><i class="icon-group"></i>編寫訂單</li>
+						<li class="PurchaserPurchasedOrder" style="text-align:auto"><a href="/Purchaser"><i class="icon-group"></i>已購買訂單</li>
+					</ul>
+				</div>
+			</div>
+			<div class="span10 ContentContainer">
+				
+			</div>
+		</script>
+		<script type="text/template" id="writeOrdersTemplate">
+			<div class="controls Input">
+				<input onclick="this.value='';" onfocus="this.select()"  placeholder="物品名稱" type="text" name="goods"/>
+				<input onclick="this.value='';" onfocus="this.select()"  placeholder="數量" type="text" name="counts"/>
+				<input onclick="this.value='';" onfocus="this.select()"  placeholder="金額" type="text" name="price"/>
+				<a href="#" class="btn btn-primary sendOrder" data-dismiss="modal">送出</a><br>
+			</div>
+			<div class="OrdersTable">
+				<table class="table table-bordered table-striped">
+					<thead>
+						<tr><th>訂單編號</th><th>物品名稱</th><th>數量</th><th>金額</th><th>狀態</th></tr>
+					</thead>
+					<tbody>
+					</tbody>
+				</table>
+			</div>
+		</script>
+		<script type="text/template" id="purchaserLoginTemplate">
+			<div id="PurchaserLoginDiv">
+				<div class="modal-header">
+					<h3>歡迎使用Ordering System</h3>
+				</div>
+				<div class="modal-body">
+					<div class="row-fluid">
+						<div class="span6">
+							<label>登入Purchaser帳號</label>
+							<form action="/Purchaser/login">
+								<fieldset>
+									<div class="control-group">
+										<div class="loginControls">
+											<input placeholder="帳號" type="text" name="account"/><br>
+											<input placeholder="密碼" type="password" name="password"/><br>
+											<a href="#" class="btn btn-primary PurchaserLogin" data-dismiss="modal">登入</a>
+										</div>
+									</div>
+								</fieldset>
+							</form>
+						</div>
+					</div>
+				</div>
+			</div>
+		</script>
+		<script type="text/template" id="purchasedOrdersTemplate">
+			<div class="controls Input">
+			</div>
+			<div class="OrdersTable">
+				<table class="table table-bordered table-striped">
+					<thead>
+						<tr><th>訂單編號</th><th>物品名稱</th><th>數量</th><th>金額</th><th>狀態</th></tr>
+					</thead>
+					<tbody>
+					</tbody>
+				</table>
+			</div>
+		</script>
+		<script type="text/javascript">
+			PurchaserView = Backbone.View.extend({
+				initialize:function(){
+
+				},
+				render:function(){
+					var template = _.template( $("#PurchaserTemplate").html(), {} );
+					this.$el.html( template );
+					this.initialize();
+					this.checkLogin();
+					window.purchaserOrderControllerModel.get("purchaserOrderCollection").off("add", this.addPurchaserOrder, this);
+					window.purchaserOrderControllerModel.get("purchasedOrderCollection").off("add", this.addPurchasedOrder, this);
+					window.purchaserOrderControllerModel.get("purchaserOrderCollection").on("add", this.addPurchaserOrder, this);
+					window.purchaserOrderControllerModel.get("purchasedOrderCollection").on("add", this.addPurchasedOrder, this);
+					window.userModel.on("change:login", this.checkLogin);
+					window.userModel.on("change:type", this.checkLogin);
+				},
+				events:{
+					"click .writeOrder":"writeOrder",
+					"click .sendOrder":"sendOrder",
+					"click .PurchaserPurchasedOrder":"purchasedOrder",
+					"click .PurchaserLogin":"purchaserLogin"
+				},
+				purchaserLogin:function(){
+					account = $("#PurchaserLoginDiv").find("input[name=account]").attr("value");
+					password = $("#PurchaserLoginDiv").find("input[name=password]").attr("value");
+					window.userModel.userLogin(account, password);
+				},
+				checkLogin:function(){
+					console.log("login status");
+					console.log(window.userModel.get("login"));
+					console.log(window.userModel.get("type"));
+					if((window.userModel.get("login") == false) || (window.userModel.get("type") != "Purchaser")){
+						var template = _.template( $("#purchaserLoginTemplate").html(), {} );
+						$(".ContentContainer").html(template,{});
+					}else{
+						var template = _.template( $("#writeOrdersTemplate").html(), {} );
+						$(".ContentContainer").html(template,{});
+						$(".ContentContainer").html("<h1>歡迎進入Purchaser介面！</h1>",{});
+					}
+				},
+				writeOrder:function(){
+					if((window.userModel.get("login") == false) || (window.userModel.get("type") != "Purchaser")){
+						var template = _.template( $("#purchaserLoginTemplate").html(), {} );
+						this.$el.find(".ContentContainer").html(template,{});
+					}else{
+						console.log("writeOrder");
+						var template = _.template( $("#writeOrdersTemplate").html(), {} );
+						this.$el.find(".ContentContainer").html(template,{});
+						window.purchaserOrderControllerModel.updatePurchaserOrders();
+					}
+				},
+				purchasedOrder:function(){
+					if((window.userModel.get("login") == false) || (window.userModel.get("type") != "Purchaser")){
+						var template = _.template( $("#purchaserLoginTemplate").html(), {} );
+						this.$el.find(".ContentContainer").html(template,{});
+					}else{
+						console.log("purchasedOrder");
+						var template = _.template( $("#purchasedOrdersTemplate").html(), {} );
+						this.$el.find(".ContentContainer").html(template,{});
+						window.purchaserOrderControllerModel.updatePurchasedOrder();
+					}
+				},
+				sendOrder:function(){
+					var reg = /^[0-9]*$/;
+					var goods = $(".controls").find("input[name=goods]").attr("value");
+					var counts = $(".controls").find("input[name=counts]").attr("value");
+					var price = $(".controls").find("input[name=price]").attr("value");
+					var getOrderNumberCallBack = function(context){
+					// 	console.log("getOrderNumberCallBack");
+						return function(data, textStatus, jqXHR){
+							// console.log("data:"+data);
+							if(data == undefined){
+								alert("無法取得訂單號碼");
+							}else{
+								if((reg.test(counts) == true) && (reg.test(price) == true)){
+									// console.log(123);
+									var plainOrder = {
+										orderNumber:data.orderNumber,
+										goods:goods,
+										counts:counts,
+										price:price,
+										status:"Not Yet Reviewed",
+										timestamp:new Date()
+									};
+								}else{
+									alert("數量與價格一定要是數字！");
+								}
+			        			var toSupervisorEncryptOrder = cryptico.encrypt(JSON.stringify(plainOrder), window.purchaserModel.get("supervisorPublicKeyString"), window.purchaserModel.get("privateKey"));
+			        			console.log(toSupervisorEncryptOrder);
+			        			var toOrdersDepartmentEncryptOrder = cryptico.encrypt(JSON.stringify(plainOrder), window.purchaserModel.get("ordersDepartmentPublicKeyString"), window.purchaserModel.get("privateKey"));
+			     //    			var privateKey = window.ordersDepartmentModel.get("privateKey");
+								// console.log(privateKey);
+								// var decryptOrder = cryptico.decrypt(toOrdersDepartmentEncryptOrder.cipher, privateKey);
+								// console.log(JSON.stringify(decryptOrder));
+			        			var input = {
+			        				orderNumber:data.orderNumber,
+			        				plainOrder:plainOrder,
+			        				toSupervisorEncryptOrder:toSupervisorEncryptOrder,
+			        				toOrdersDepartmentEncryptOrder:toOrdersDepartmentEncryptOrder
+			        			};
+			        			var sendOrderCallback = function(context){
+									return function(data, textStatus, jqXHR){
+										console.log("data.plainOrder");
+										console.log(data.plainOrder);
+										context.addOnePurchaserOrder(data.plainOrder);
+									}
+								}
+			        			$.post(
+									"/Purchaser/SendOrder",
+									input,
+									sendOrderCallback(context)
+								);
+							}
+						};
+					};
+					$.get(
+						"/Purchaser/getOrderNumber",
+						getOrderNumberCallBack(this),
+						"json"
+					);
+				},
+				addPurchaserOrder:function(model, collection, option){
+					console.log("addPurchaserOrder");
+					var orderTable = this.$el.find(".OrdersTable").find("tbody");
+					var order = "<tr><td>" + model.get("orderNumber")+ "</td>" + "<td>"+ model.get("goods")+ "</td>" + "<td>"+ model.get("counts")+ "</td>" + "<td>"+ model.get("price")+ "</td>" + "<td>"+ model.get("status")+ "</td></tr>";
+					// console.log(orderTable)
+					orderTable.append(order);
+				},
+				addPurchasedOrder:function(model,collection,option){
+					console.log("addPurchasedOrder");
+					console.log(model);
+					var orderTable = this.$el.find(".OrdersTable").find("tbody");
+					var order = "<tr><td>" + model.get("orderNumber")+ "</td>" + "<td>"+ model.get("goods")+ "</td>" + "<td>"+ model.get("counts")+ "</td>" + "<td>"+ model.get("price")+ "</td>" + "<td>"+ model.get("status")+ "</td></tr>";
+					// console.log(orderTable)
+					orderTable.append(order);
+				},
+				addOnePurchaserOrder:function(model){
+					console.log("addOnePurchaserOrder");
+					console.log(model);
+					var orderTable = this.$el.find(".OrdersTable").find("tbody");
+					var order = "<tr><td>" + model.orderNumber+ "</td>" + "<td>"+ model.goods+ "</td>" + "<td>"+ model.counts+ "</td>" + "<td>"+ model.price+ "</td>" + "<td>"+ model.status+ "</td></tr>";
+					console.log(orderTable)
+					orderTable.append(order);
+				}
+			});
+		</script>
+		<!-- Supervisor View -->
+		<script type="text/template" id="SupervisorTemplate">
+			<div class="span2 LeftMenu">
+				<div class="span10 well" style="padding: 8px 0;">
+					<ul class="nav nav-list LeftList">
+						<li class="verifyOrder" style="text-align:auto"><a href="/Supervisor"><i class="icon-group"></i>待審核訂單</li>
+						<li class="verifiedOrder" style="text-align:auto"><a href="/Supervisor"><i class="icon-group"></i>已審核訂單</li>
+					</ul>
+				</div>
+			</div>
+			<div class="span10 ContentContainer">
+				<h1>歡迎進入Supervisor介面！</h1>
+			</div>
+		</script>
+		<script type="text/template" id="verifyOrderTemplate">
+			<div class="OrdersTable">
+				<table class="table table-bordered table-striped">
+					<thead>
+						<tr><th class="orderNumber">訂單編號</th><th>物品名稱</th><th>數量</th><th>金額</th><th class="last">審核</th></tr>
+					</thead>
+					<tbody>
+					</tbody>
+				</table>
+			</div>
+		</script>
+		<script type="text/template" id="supervisorLoginTemplate">
+			<div id="SupervisorLoginDiv">
+				<div class="modal-header">
+					<h3>歡迎使用Ordering System</h3>
+				</div>
+				<div class="modal-body">
+					<div class="row-fluid">
+						<div class="span6">
+							<label>登入Supervisor帳號</label>
+							<form action="/Supervisor/login">
+								<fieldset>
+									<div class="control-group">
+										<div class="loginControls">
+											<input placeholder="帳號" type="text" name="account"/><br>
+											<input placeholder="密碼" type="password" name="password"/><br>
+											<a href="#" class="btn btn-primary SupervisorLogin" data-dismiss="modal">登入</a>
+										</div>
+									</div>
+								</fieldset>
+							</form>
+						</div>
+					</div>
+				</div>
+			</div>
+		</script>
+		<script type="text/template" id="verifiedOrderTemplate">
+			<div class="OrdersTable">
+				<table class="table table-bordered table-striped">
+					<thead>
+						<tr><th class="orderNumber">訂單編號</th><th>物品名稱</th><th>數量</th><th>金額</th><th>狀態</th></tr>
+					</thead>
+					<tbody>
+					</tbody>
+				</table>
+			</div>
+		</script>
+		<script type="text/javascript">
+			SupervisorView = Backbone.View.extend({
+				initialize:function(){
+
+				},
+				render:function(){
+					var template = _.template( $("#SupervisorTemplate").html(), {} );
+					this.$el.html( template );
+					this.checkLogin();
+					window.supervisorOrderControllerModel.get("purchaserToSupervisorOrderCollection").off("add", this.addPurchaserToSupervisorOrder, this);
+					window.supervisorOrderControllerModel.get("supervisorVerifiedOrderCollection").off("add", this.addsupervisorVerifiedOrder, this);
+					window.supervisorOrderControllerModel.get("purchaserToSupervisorOrderCollection").on("add", this.addPurchaserToSupervisorOrder, this);
+					window.supervisorOrderControllerModel.get("supervisorVerifiedOrderCollection").on("add", this.addsupervisorVerifiedOrder, this);
+					window.userModel.on("change:login", this.checkLogin);
+					window.userModel.on("change:type", this.checkLogin);
+				},
+				events:{
+					"click .verifyOrder":"verifyOrder",
+					"click .sendVerifiedOrder":"sendVerifiedOrder",
+					"click .verifiedOrder":"verifiedOrder",
+					"click .SupervisorLogin":"supervisorLogin"
+				},
+				supervisorLogin:function(){
+					console.log("supervisorLogin");
+					account = $("#SupervisorLoginDiv").find("input[name=account]").attr("value");
+					password = $("#SupervisorLoginDiv").find("input[name=password]").attr("value");
+					window.userModel.userLogin(account, password);
+				},
+				checkLogin:function(){
+					console.log("login status");
+					console.log(window.userModel.get("login"));
+					console.log(window.userModel.get("type"));
+					if((window.userModel.get("login") == false) || (window.userModel.get("type") != "Supervisor")){
+						var template = _.template( $("#supervisorLoginTemplate").html(), {} );
+						$(".ContentContainer").html(template,{});
+					}else{
+						var template = _.template( $("#verifyOrderTemplate").html(), {} );
+						$(".ContentContainer").html(template,{});
+						$(".ContentContainer").html("<h1>歡迎進入Supervisor介面！</h1>",{});
+					}
+				},
+				verifyOrder:function(){
+					if((window.userModel.get("login") == false) || (window.userModel.get("type") != "Supervisor")){
+						var template = _.template( $("#supervisorLoginTemplate").html(), {} );
+						$(".ContentContainer").html(template,{});
+					}else{
+						var template = _.template( $("#verifyOrderTemplate").html(), {} );
+						this.$el.find(".ContentContainer").html(template,{});
+						window.supervisorOrderControllerModel.updatePurchaserToSupervisorOrder();
+					}
+				},
+				verifiedOrder:function(){
+					if((window.userModel.get("login") == false) || (window.userModel.get("type") != "Supervisor")){
+						var template = _.template( $("#supervisorLoginTemplate").html(), {} );
+						$(".ContentContainer").html(template,{});
+					}else{
+						var template = _.template( $("#verifiedOrderTemplate").html(), {} );
+						this.$el.find(".ContentContainer").html(template,{});
+						window.supervisorOrderControllerModel.updateVerifiedOrder();
+					}
+				},
+				addsupervisorVerifiedOrder:function(model, collection, option){
+					console.log("addsupervisorVerifiedOrder");
+					var orderTable = this.$el.find(".OrdersTable").find("tbody");
+					var order = "<tr><td>" + model.get("orderNumber")+ "</td>" + "<td>"+ model.get("goods")+ "</td>" + "<td>"+ model.get("counts")+ "</td>" + "<td>"+ model.get("price")+ "</td>" + "<td>"+ model.get("status") + "</td></tr>";
+					orderTable.append(order);
+				},
+				addPurchaserToSupervisorOrder:function(model, collection, option){
+					console.log("addPurchaserToSupervisorOrder");
+					var orderTable = this.$el.find(".OrdersTable").find("tbody");
+					var order = "<tr><td>" + model.get("orderNumber")+ "</td>" + "<td>"+ model.get("goods")+ "</td>" + "<td>"+ model.get("counts")+ "</td>" + "<td>"+ model.get("price")+ "</td>" + "<td>"+ "<a href=\"#\" class=\"btn btn-primary sendVerifiedOrder\" data-dismiss=\"modal\" id=\""+ model.get("orderNumber") +"\">通過</a>" + "</td></tr>";
+					orderTable.append(order);
+				},
+				sendVerifiedOrder:function(context){
+					console.log("sendVerifiedOrder");
+					console.log(context.target.id);
+					window.supervisorOrderControllerModel.sendVerifyOrder(context.target.id);
+				}
+			});
+		</script>
+		<script type="text/javascript">
+			SupervisorOrderModel = Backbone.Model.extend({
+				defaults:{
+					orderNumber:"",
+					goods:"",
+					counts:"",
+					price:"",
+					status:"",
+					timestamp:""
+				},
+				initialize:function(){
+
+				},
+				render:function(){
+
+				}
+			});
+			SupervisorOrderCollection = Backbone.Collection.extend({
+				model:SupervisorOrderModel,
+				pushSupervisorOrderModel:function(order){
+					console.log("push");
+					console.log(order);
+					this.push(order);
+				}
+			});
+			SupervisorOrderControllerModel = Backbone.Model.extend({
+				defaults:{
+					purchaserToSupervisorOrderCollection: new SupervisorOrderCollection(),
+					supervisorVerifiedOrderCollection: new SupervisorOrderCollection()
+				},
+				intialize:function(){
+
+				},
+				render:function(){
+
+				},
+				sendVerifyOrder:function(orderNumber){
+					console.log("sendVerifyOrder:" + orderNumber);
+					var context = this;
+					this.get("purchaserToSupervisorOrderCollection").forEach(function(order){
+						if(order.get("orderNumber") == orderNumber){
+							context.removePurchaserToSupervisorOrder(orderNumber);
+							order.set({status:"verified"});
+							var plainOrder = {
+								orderNumber:order.get("orderNumber"),
+								goods:order.get("goods"),
+								counts:order.get("counts"),
+								price:order.get("price"),
+								status:order.get("status"),
+								timestamp:order.get("timestamp")
+							};
+							var toOrdersDepartmentEncryptOrder = cryptico.encrypt(JSON.stringify(plainOrder), window.supervisorModel.get("ordersDepartmentPublicKeyString"), window.supervisorModel.get("privateKey"));
+			        		// console.log(toOrdersDepartmentEncryptOrder);
+		        			var input = {
+		        				orderNumber:orderNumber,
+		        				plainOrder:plainOrder,
+		        				toOrdersDepartmentEncryptOrder:toOrdersDepartmentEncryptOrder
+		        			};
+		        			context.sendVerifyOrderAPI(input);
+						}
+					});
+				},
+				sendVerifyOrderAPI:function(input){
+					console.log("sendVerifyOrderAPI");
+					console.log(input.plainOrder);
+					input.toOrdersDepartmentEncryptOrder.orderNumber = input.plainOrder.orderNumber;
+					console.log(input.toOrdersDepartmentEncryptOrder);
+					location.reload();
+					$.post("/Supervisor/sendVerifiedOrder", 
+						{
+							orderNumber:input.orderNumber,
+							plainOrder:input.plainOrder,
+							toOrdersDepartmentEncryptOrder:input.toOrdersDepartmentEncryptOrder
+						});
+				},
+				removePurchaserToSupervisorOrder:function(orderNumber){
+					console.log("removePurchaserToSupervisorOrder");
+					var input = {
+						orderNumber:orderNumber
+					};
+					var removePurchaserToSupervisorOrderCallback = function(context){
+						return function(data, textStatus, jqXHR){
+							console.log(data);
+						};
+					}
+					$.post(
+						"/Supervisor/removePurchaserToSupervisorOrder",
+						input,
+						removePurchaserToSupervisorOrderCallback(this)
+					);
+
+				},
+				updateVerifiedOrder:function(){
+					console.log("updateVerifiedOrder");
+					var updateVerifiedOrderCallback = function(context){
+						return function(data, textStatus, jqXHR){
+							console.log(data);
+							if(data.verifiedOrders instanceof Array){
+								var verifiedOrders = data.verifiedOrders;
+								verifiedOrders.forEach(function(order){
+									var verifiedOrder = new SupervisorOrderModel();
+									verifiedOrder.set({
+										orderNumber:order.orderNumber,
+										goods:order.goods,
+										counts:order.counts,
+										price:order.price,
+										status:order.status,
+										timestamp:order.timestamp
+									});
+									context.get("supervisorVerifiedOrderCollection").pushSupervisorOrderModel(verifiedOrder);
+								});
+							}
+						}
+					}
+					$.get(
+						"/Supervisor/getVerifiedOrder",
+						updateVerifiedOrderCallback(this),
+						"json"
+						)
+				},
+				updatePurchaserToSupervisorOrder:function(){
+					console.log("updatePurchaserToSupervisorOrder");
+					var updatePurchaserToSupervisorOrderCallback = function(context){
+						return function(data, textStatus, jqXHR){
+							if(data != undefined){
+								if(data.purchaserToSupervisorEncryptOrders instanceof Array){
+									var encryptOrderList = data.purchaserToSupervisorEncryptOrders;
+									encryptOrderList.forEach(function(encryptOrder){
+										var privateKey = window.supervisorModel.get("privateKey");
+										var decryptOrder = cryptico.decrypt(encryptOrder.cipher, privateKey);
+										console.log(JSON.stringify(decryptOrder));
+										if(decryptOrder.status == "success"){
+											if(decryptOrder.signature == "verified"){
+												var order = JSON.parse(decryptOrder.plaintext);
+												newSupervisorOrder = new SupervisorOrderModel();
+												newSupervisorOrder.set({
+													orderNumber:order.orderNumber,
+													goods:order.goods,
+													counts:order.counts,
+													price:order.price,
+													timestamp:order.timestamp
+												});
+												console.log(newSupervisorOrder);
+												context.get("purchaserToSupervisorOrderCollection").pushSupervisorOrderModel(newSupervisorOrder);
+											}
+										}
+									});
+								}
+							// 	var orderList = data.orders;
+							// 	orderList.forEach(function(order){
+							// 		newPurchaserOrder = new PurchaserOrderModel();
+							// 		newPurchaserOrder.set({
+							// 			orderNumber:order.orderNumber,
+							// 			goods:order.goods,
+							// 			counts:order.counts,
+							// 			price:order.price,
+							// 			status:order.status
+							// 		});
+							// 		context.get("purchaserOrderCollection").pushPurchaserOrderModel(newPurchaserOrder);
+							// 	});
+							}
+						}
+					};
+					$.get(
+						"/Supervisor/Orders",
+						updatePurchaserToSupervisorOrderCallback(this),
+						"json"
+					);
+				}
+			})
+		</script>
+		<!-- OrdersDepartment View -->
+		<script type="text/template" id="OrdersDepartmentTemplate">
+			<div class="span2 LeftMenu">
+				<div class="span10 well" style="padding: 8px 0;">
+					<ul class="nav nav-list LeftList">
+						<li style="text-align:auto" class="waitedOrder"><a href="/OrdersDepartment"><i class="icon-group"></i>待採購訂單</li>
+						<li style="text-align:auto" class="purchasedOrder"><a href="/OrdersDepartment"><i class="icon-group"></i>已採購訂單</li>
+					</ul>
+				</div>
+			</div>
+			<div class="span10 ContentContainer">
+				<h1>歡迎進入Orders Department介面！</h1>
+			</div>
+		</script>
+		<script type="text/template" id="waitedOrderTemplate">
+			<div class="OrdersTable">
+				<table class="table table-bordered table-striped">
+					<thead>
+						<tr><th class="orderNumber">訂單編號</th><th>物品名稱</th><th>數量</th><th>金額</th><th class="last">購買</th></tr>
+					</thead>
+					<tbody>
+					</tbody>
+				</table>
+			</div>
+		</script>
+		<script type="text/template" id="ordersDepartmentLoginTemplate">
+			<div id="OrdersDepartmentLoginDiv">
+				<div class="modal-header">
+					<h3>歡迎使用Ordering System</h3>
+				</div>
+				<div class="modal-body">
+					<div class="row-fluid">
+						<div class="span6">
+							<label>登入OrdersDepartment帳號</label>
+							<form action="/登入OrdersDepartment帳號/login">
+								<fieldset>
+									<div class="control-group">
+										<div class="loginControls">
+											<input placeholder="帳號" type="text" name="account"/><br>
+											<input placeholder="密碼" type="password" name="password"/><br>
+											<a href="#" class="btn btn-primary OrdersDepartmentLogin" data-dismiss="modal">登入</a>
+										</div>
+									</div>
+								</fieldset>
+							</form>
+						</div>
+					</div>
+				</div>
+			</div>
+		</script>
+		<script type="text/template" id="purchasedOrderTemplate">
+			<div class="OrdersTable">
+				<table class="table table-bordered table-striped">
+					<thead>
+						<tr><th class="orderNumber">訂單編號</th><th>物品名稱</th><th>數量</th><th>金額</th><th>狀態</th></tr>
+					</thead>
+					<tbody>
+					</tbody>
+				</table>
+			</div>
+		</script>
+		<script type="text/javascript">
+			OrdersDepartmentView = Backbone.View.extend({
+				initialize:function(){
+
+				},
+				render:function(){
+					var template = _.template( $("#OrdersDepartmentTemplate").html(), {} );
+					this.$el.html( template );
+					this.checkLogin();
+					// $(this.el).undelegate('.sendPurchasedOrder', 'click');
+					// $(this.el).delegate('.sendPurchasedOrder', 'click', this.sendPurchasedOrder);
+					window.ordersDepartmentOrderControllerModel.get("supervisorToOrdersDepartmentOrderCollection").off("add", this.addSupervisorToOrdersDepartmentOrder, this);
+					window.ordersDepartmentOrderControllerModel.get("ordersDepartmentPurchasedOrderCollection").off("add", this.addOrdersDepartmentPurchasedOrder, this);
+					window.ordersDepartmentOrderControllerModel.get("supervisorToOrdersDepartmentOrderCollection").on("add", this.addSupervisorToOrdersDepartmentOrder, this);
+					window.ordersDepartmentOrderControllerModel.get("ordersDepartmentPurchasedOrderCollection").on("add", this.addOrdersDepartmentPurchasedOrder, this);
+					window.userModel.on("change:login", this.checkLogin);
+					window.userModel.on("change:type", this.checkLogin);
+				},
+				events:{
+					"click .waitedOrder":"waitedOrder",
+					"click .purchasedOrder":"purchasedOrder",
+					"click .sendPurchasedOrder":"sendPurchasedOrder",
+					"click .OrdersDepartmentLogin":"ordersDepartmentLogin"
+				},
+				ordersDepartmentLogin:function(){
+					account = $("#OrdersDepartmentLoginDiv").find("input[name=account]").attr("value");
+					password = $("#OrdersDepartmentLoginDiv").find("input[name=password]").attr("value");
+					window.userModel.userLogin(account, password);
+				},
+				checkLogin:function(){
+					console.log("login status");
+					console.log(window.userModel.get("login"));
+					console.log(window.userModel.get("type"));
+					if((window.userModel.get("login") == false) || (window.userModel.get("type") != "OrdersDepartment")){
+						var template = _.template( $("#ordersDepartmentLoginTemplate").html(), {} );
+						$(".ContentContainer").html(template,{});
+					}else{
+						var template = _.template( $("#waitedOrderTemplate").html(), {} );
+						$(".ContentContainer").html(template,{});
+						$(".ContentContainer").html("<h1>歡迎進入OrdersDepartment介面！</h1>",{});
+					}
+				},
+				waitedOrder:function(){
+					console.log("waitedOrder");
+					if((window.userModel.get("login") == false) || (window.userModel.get("type") != "OrdersDepartment")){
+						var template = _.template( $("#ordersDepartmentLoginTemplate").html(), {} );
+						$(".ContentContainer").html(template,{});
+					}else{
+						var template = _.template( $("#waitedOrderTemplate").html(), {} );
+						this.$el.find(".ContentContainer").html(template,{});
+						window.ordersDepartmentOrderControllerModel.updateWaitedOrder();
+					}
+				},
+				purchasedOrder:function(){
+					if((window.userModel.get("login") == false) || (window.userModel.get("type") != "OrdersDepartment")){
+						var template = _.template( $("#ordersDepartmentLoginTemplate").html(), {} );
+						$(".ContentContainer").html(template,{});
+					}else{
+						console.log("purchasedOrder");
+						var template = _.template( $("#purchasedOrderTemplate").html(), {} );
+						this.$el.find(".ContentContainer").html(template,{});
+						window.ordersDepartmentOrderControllerModel.updatePurchasedOrder();
+					}
+				},
+				addSupervisorToOrdersDepartmentOrder:function(model, collection, option){
+					console.log("addSupervisorToOrdersDepartmentOrder");
+					var orderTable = this.$el.find(".OrdersTable").find("tbody");
+					var order = "<tr><td>" + model.get("orderNumber")+ "</td>" + "<td>"+ model.get("goods")+ "</td>" + "<td>"+ model.get("counts")+ "</td>" + "<td>"+ model.get("price")+ "</td>" + "<td>"+ "<a href=\"#\" class=\"btn btn-primary sendPurchasedOrder\" data-dismiss=\"modal\" id=\""+ model.get("orderNumber") +"\">通知已購買</a>" + "</td></tr>";
+					orderTable.append(order);
+				},
+				addOrdersDepartmentPurchasedOrder:function(model, collectin, option){
+					console.log("addOrdersDepartmentPurchasedOrder");
+					var orderTable = this.$el.find(".OrdersTable").find("tbody");
+					var order = "<tr><td>" + model.get("orderNumber")+ "</td>" + "<td>"+ model.get("goods")+ "</td>" + "<td>"+ model.get("counts")+ "</td>" + "<td>"+ model.get("price")+ "</td>" + "<td>"+ model.get("status") + "</td></tr>";
+					orderTable.append(order);
+				},
+				sendPurchasedOrder:function(context){
+					console.log("sendPurchasedOrder");
+					console.log(context.target.id);
+					location.reload();
+					window.ordersDepartmentOrderControllerModel.sendPurchasedOrder(context.target.id);
+				}
+				// addsupervisorVerifiedOrder:function(model, collection, option){
+				// 	console.log("addsupervisorVerifiedOrder");
+				// 	var orderTable = this.$el.find(".OrdersTable").find("tbody");
+				// 	var order = "<tr><td>" + model.get("orderNumber")+ "</td>" + "<td>"+ model.get("goods")+ "</td>" + "<td>"+ model.get("counts")+ "</td>" + "<td>"+ model.get("price")+ "</td>" + "<td>"+ model.get("status") + "</td></tr>";
+				// 	orderTable.append(order);
+				// }
+			});
+		</script>
+
+		<script type="text/javascript">
+			OrdersDepartmentOrderModel = Backbone.Model.extend({
+				defaults:{
+					orderNumber:"",
+					goods:"",
+					counts:"",
+					price:"",
+					status:""
+				},
+				initialize:function(){
+
+				},
+				render:function(){
+
+				}
+			});
+			OrdersDepartmentOrderCollection = Backbone.Collection.extend({
+				model:OrdersDepartmentOrderModel,
+				pushOrdersDepartmentOrderModel:function(order){
+					console.log("push");
+					console.log(order);
+					this.push(order);
+				}
+			});
+			OrdersDepartmentOrderControllerModel = Backbone.Model.extend({
+				defaults:{
+					supervisorToOrdersDepartmentOrderCollection: new OrdersDepartmentOrderCollection(),
+					ordersDepartmentPurchasedOrderCollection: new OrdersDepartmentOrderCollection()
+				},
+				intialize:function(){
+
+				},
+				render:function(){
+
+				},
+				sendPurchasedOrder:function(orderNumber){
+					console.log("sendPurchasedOrder:" + orderNumber);
+					var context = this;
+					this.get("supervisorToOrdersDepartmentOrderCollection").forEach(function(order){
+						if(order.get("orderNumber") == orderNumber){
+							context.removeSupervisorToOrdersDepartmentOrder(orderNumber);
+							order.set({status:"purchased"});
+							var plainOrder = {
+								orderNumber:order.get("orderNumber"),
+								goods:order.get("goods"),
+								counts:order.get("counts"),
+								price:order.get("price"),
+								status:order.get("status"),
+								timestamp:order.get("timestamp")
+							};	
+							var toPurchaserEncryptOrder = cryptico.encrypt(JSON.stringify(plainOrder), window.ordersDepartmentModel.get("purchaserPublicKeyString"), window.ordersDepartmentModel.get("privateKey"));
+			        		console.log(toPurchaserEncryptOrder);
+		        			var input = {
+		        				orderNumber:orderNumber,
+		        				plainOrder:plainOrder,
+		        				toPurchaserEncryptOrder:toPurchaserEncryptOrder
+		        			};
+		        			context.sendPurchasedOrderAPI(input);
+						}
+					});
+				},
+				sendPurchasedOrderAPI:function(input){
+					console.log("sendPurchasedOrderAPI");
+					console.log(input.plainOrder);
+					input.toPurchaserEncryptOrder.orderNumber = input.plainOrder.orderNumber;
+					console.log(input.toPurchaserEncryptOrder);
+					// console.log
+					$.post("/OrdersDepartment/sendPurchasedOrder", 
+						{
+							orderNumber:input.orderNumber,
+							plainOrder:input.plainOrder,
+							toPurchaserEncryptOrder:input.toPurchaserEncryptOrder
+						});
+				},
+				removeSupervisorToOrdersDepartmentOrder:function(orderNumber){
+					console.log("removeSupervisorToOrdersDepartmentOrder");
+					var input = {
+						orderNumber:orderNumber
+					};
+					var removeSupervisorToOrdersDepartmentOrderCallback = function(context){
+						return function(data, textStatus, jqXHR){
+							console.log(data);
+						};
+					}
+					$.post(
+						"/OrdersDepartment/removeSupervisorToOrdersDepartmentOrder",
+						input,
+						removeSupervisorToOrdersDepartmentOrderCallback(this)
+					);
+
+				},
+				updateWaitedOrder:function(){
+					console.log("updateWaitedOrder");
+					var getWaitedOrderCallback = function(context){
+						return function(data, textStatus, jqXHR){
+							console.log(data);
+							var privateKey = window.ordersDepartmentModel.get("privateKey");
+							if(data.supervisorToOrdersDepartmentEncryptOrders instanceof Array){
+								if(data.purchaserToOrdersDepartmentEncryptOrders instanceof Array){
+									data.supervisorToOrdersDepartmentEncryptOrders.forEach(function(sOrder){
+										data.purchaserToOrdersDepartmentEncryptOrders.forEach(function(pOrder){
+											if(sOrder.orderNumber == pOrder.orderNumber){
+												console.log(sOrder.cipher);
+												console.log(privateKey);
+												var decrypt_sOrder = cryptico.decrypt(sOrder.cipher, privateKey);
+												var decrypt_pOrder = cryptico.decrypt(pOrder.cipher, privateKey);
+												console.log(decrypt_sOrder);
+												console.log(decrypt_pOrder);
+												if(decrypt_sOrder.signature == 'verified'){
+													if(decrypt_pOrder.signature == 'verified'){
+														var sPlaintext = JSON.parse(decrypt_sOrder.plaintext);
+														var pPlaintext = JSON.parse(decrypt_pOrder.plaintext);
+														console.log(sPlaintext.timestamp);
+														console.log(pPlaintext.timestamp);
+														if(sPlaintext.timestamp == pPlaintext.timestamp){
+															console.log("same");
+															var order = sPlaintext;
+															newOrderspartmentOrder = new OrdersDepartmentOrderModel();
+															newOrderspartmentOrder.set({
+																orderNumber:order.orderNumber,
+																goods:order.goods,
+																counts:order.counts,
+																price:order.price,
+																timestamp:order.timestamp
+															});
+														context.get("supervisorToOrdersDepartmentOrderCollection").pushOrdersDepartmentOrderModel(newOrderspartmentOrder);
+														}
+													}
+												}
+											}
+										});
+									});
+								}
+							}
+						}
+					}
+					$.get(
+						"/OrdersDepartment/getWaitedOrder",
+						getWaitedOrderCallback(this),
+						"json"
+						)
+				},
+				updatePurchasedOrder:function(){
+					console.log("updatePurchasedOrder");
+					var updatePurchasedOrderCallback = function(context){
+						return function(data, textStatus, jqXHR){
+							console.log(JSON.stringify(data));
+							if(data != undefined){
+								if(data.purchasedOrders instanceof Array){
+									var orderList = data.purchasedOrders;
+									orderList.forEach(function(order){
+										newPurchasedOrder = new OrdersDepartmentOrderModel();
+										newPurchasedOrder.set({
+											orderNumber:order.orderNumber,
+											goods:order.goods,
+											counts:order.counts,
+											price:order.price,
+											status:order.status
+										});
+										console.log(JSON.stringify(newPurchasedOrder));
+										console.log(context);
+										context.get("ordersDepartmentPurchasedOrderCollection").pushOrdersDepartmentOrderModel(newPurchasedOrder);
+									});
+								}
+							}
+						}
+					};
+					$.get(
+						"/OrdersDepartment/PurchasedOrders",
+						updatePurchasedOrderCallback(this),
+						"json"
+					);
+				}
+			});
+		</script>
+		<!--  Push State Router  -->
+		<script type="text/javascript">
+			Workspace = Backbone.Router.extend({
+				routes:{
+					"":"Index",
+					"Purchaser":"Purchaser",
+					"OrdersDepartment":"OrdersDepartment",
+					"Supervisor":"Supervisor"
+				},
+				Index:function(){
+					// console.log("Index Route");
+					window.mainContainerView.changeContent(window.mainContainerView.indexView);
+				},
+				Purchaser:function(){
+					$(this.el).undelegate('.sendPurchasedOrder', 'click');
+					// window.purchaserModel = new PurchaserModel();
+					// console.log("Purchaser Route");
+					window.mainContainerView.changeContent(window.mainContainerView.purchaserView);
+				},
+				OrdersDepartment:function(){
+					// window.ordersDepartmentModel = new OrdersDepartmentModel();
+					// console.log("OrdersDepartment Route");
+					window.mainContainerView.changeContent(window.mainContainerView.ordersDepartmentView);
+				},
+				Supervisor:function(){
+					$(this.el).undelegate('.sendPurchasedOrder', 'click');
+					// window.supervisorModel = new SupervisorModel();
+					// console.log("Supervisor Route");
+					window.mainContainerView.changeContent(window.mainContainerView.supervisorView);
+				}
+			});
+			RoutingInitialize = function(){
+				window.workspace = new Workspace();
+				Backbone.history.start({
+					pushState: true,
+					root: '/'
+				});
+				$(document).on("click", "a", function(e){
+					var url = $(this).attr('href');
+					var exceptionURL = new Array(
+					);
+					var exception = false;
+					for (var i = 0; i < exceptionURL.length; i++) {
+						if (exceptionURL[i].match(url)){
+							exception = true;
+						}
+					}
+					if(url && url.indexOf('/') == 0 && !exception) {
+						e.preventDefault();
+						Backbone.history.navigate($(this).attr('href'), {trigger: true});
+					}
+				});
+			}
+		</script>
+
+		<script type="text/javascript">
+			$(document).ready(function(){
+				window.globalEventTrigger = _.extend({}, Backbone.Events);
+			});
+		</script>
+		<script type="text/javascript">
+			(function($){
+				$(document).ready(function(){
+					_.templateSettings = { interpolate : /\{\{(.+?)\}\}/g };
+					window.mainContainerView = new MainContainerView({ el: $("#MainContainer") });
+					window.topNavigatorView = new TopNavigatorView({ el: $("#TopNavigator") });
+					// window.purchaserModel = new PurchaserModel();
+					// window.supervisorModel = new SupervisorModel();
+					// window.purchaserOrderModel = new PurchaserOrderModel();
+					// window.supervisorOrderModel = new SupervisorOrderModel();
+					window.userModel = new UserModel();
+					window.purchaserModel = new PurchaserModel();
+					window.supervisorModel = new SupervisorModel();
+					window.ordersDepartmentModel = new OrdersDepartmentModel();
+					window.purchaserOrderControllerModel = new PurchaserOrderControllerModel();
+					// window.supervisorOrderModel = new SupervisorOrderModel();
+					window.supervisorOrderControllerModel = new SupervisorOrderControllerModel();
+					window.ordersDepartmentOrderControllerModel = new OrdersDepartmentOrderControllerModel();
+					RoutingInitialize();
+					// window.mainContainerView = new MainContainerView({ el: $("#MainContainer") });
+					// function print(string){
+     //        			document.write(string + "\n\n");
+     //    			}
+        // var PassPhrase = "The Moon is a Harsh Mistress.";
+        // var Bits = 512;
+        
+        // console.log("Matt's passphrase: " + PassPhrase);
+        // console.log("Bit length: " + Bits);
+        
+        // var MattsRSAkey = cryptico.generateRSAKey(PassPhrase, Bits);
+        // var MattsPublicKeyString = cryptico.publicKeyString(MattsRSAkey);    
+        // console.log(cryptico);
+        // console.log("Matt's public key string:");
+        // console.log(MattsPublicKeyString);
+        
+        // var PlainText = "Matt, I need you to help me with my Starcraft strategy.";
+        // var hmac = CryptoJS.algo.HMAC.create(CryptoJS.algo.SHA256, "Secret Passphrase");
+
+        
+        // console.log("Sam's message: " + PlainText);
+        
+        // var EncryptionResult = cryptico.encrypt(PlainText, MattsPublicKeyString);
+        
+        // console.log("The encrypted message:");
+        // console.log(EncryptionResult.cipher);        
+        
+        // var DecryptionResult = cryptico.decrypt(EncryptionResult.cipher, MattsRSAkey);
+        
+        // console.log("The decrypted message:");
+        // console.log(DecryptionResult.plaintext);        
+        // console.log("DecryptionResult.signature: " + DecryptionResult.signature);
+
+				})
+			})(jQuery);
+		</script>
+	</body>
+</html>
